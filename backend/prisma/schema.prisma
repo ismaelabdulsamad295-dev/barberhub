@@ -1,0 +1,118 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CUSTOMER
+  PROVIDER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum Category {
+  BARBER
+  SALON
+  BOTH
+}
+
+enum TargetAudience {
+  MEN
+  WOMEN
+  UNISEX
+}
+
+enum AppointmentStatus {
+  HELD
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  NO_SHOW
+}
+
+model User {
+  id               String     @id @default(uuid()) @db.Uuid
+  email            String     @unique @db.VarChar(255)
+  passwordHash     String     @map("password_hash") @db.VarChar(255)
+  fullName         String     @map("full_name") @db.VarChar(120)
+  role             Role
+  status           UserStatus @default(ACTIVE)
+  failedLoginCount Int        @default(0) @map("failed_login_count")
+  lockedUntil      DateTime?  @map("locked_until") @db.Timestamptz(6)
+  createdAt        DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  provider     ProviderProfile?
+  appointments Appointment[]    @relation("CustomerAppointments")
+
+  @@map("users")
+}
+
+model ProviderProfile {
+  id                 String             @id @default(uuid()) @db.Uuid
+  userId             String             @unique @map("user_id") @db.Uuid
+  businessName       String             @map("business_name") @db.VarChar(150)
+  category           Category
+  bio                String?            @db.Text
+  verificationStatus VerificationStatus @default(PENDING) @map("verification_status")
+  createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  services     Service[]
+  appointments Appointment[]
+
+  @@map("provider_profiles")
+}
+
+model Service {
+  id             String         @id @default(uuid()) @db.Uuid
+  providerId     String         @map("provider_id") @db.Uuid
+  name           String         @db.VarChar(120)
+  description    String?        @db.Text
+  durationMin    Int            @map("duration_min")
+  priceCents     Int            @map("price_cents")
+  isActive       Boolean        @default(true) @map("is_active")
+  targetAudience TargetAudience @map("target_audience")
+
+  provider     ProviderProfile @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  appointments Appointment[]
+
+  @@index([providerId])
+  @@map("services")
+}
+
+model Appointment {
+  id                 String            @id @default(uuid()) @db.Uuid
+  customerId         String            @map("customer_id") @db.Uuid
+  providerId         String            @map("provider_id") @db.Uuid
+  serviceId          String            @map("service_id") @db.Uuid
+  // Managed by raw SQL: the Prisma client cannot write tstzrange values.
+  timeRange          Unsupported("tstzrange") @map("time_range")
+  status             AppointmentStatus @default(HELD)
+  holdExpiresAt      DateTime?         @map("hold_expires_at") @db.Timestamptz(6)
+  priceCentsSnapshot Int               @map("price_cents_snapshot")
+  createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  customer User            @relation("CustomerAppointments", fields: [customerId], references: [id])
+  provider ProviderProfile @relation(fields: [providerId], references: [id])
+  service  Service         @relation(fields: [serviceId], references: [id])
+
+  @@index([providerId])
+  @@index([customerId])
+  @@map("appointments")
+}
