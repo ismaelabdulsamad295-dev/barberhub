@@ -1,4 +1,5 @@
 import { Body, Controller, Get, HttpCode, Post, Request, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -15,13 +16,14 @@ export class AuthController {
     return this.authService.register(dto);
   }
 
+  // At most 5 login attempts per minute per IP address
   @Post('login')
   @HttpCode(200)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
   }
 
-  // Any logged-in user with a valid token
   @Get('me')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('CUSTOMER', 'PROVIDER', 'ADMIN')
@@ -29,7 +31,6 @@ export class AuthController {
     return req.user;
   }
 
-  // Only admins
   @Get('admin-only')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
