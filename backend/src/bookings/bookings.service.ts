@@ -18,6 +18,22 @@ export class BookingsService {
     }
     const end = new Date(start.getTime() + service.durationMin * 60000);
 
+    // Check the provider's weekly hours. Times are compared in UTC for this project.
+    const hhmm = (d: Date) =>
+      `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
+
+    const rule = await this.prisma.availabilityRule.findFirst({
+      where: {
+        providerId: service.providerId,
+        weekday: start.getUTCDay(),
+        startTime: { lte: hhmm(start) },
+        endTime: { gte: hhmm(end) },
+      },
+    });
+    if (!rule) {
+      throw new BadRequestException('Outside the provider working hours');
+    }
+
     try {
       // The time range is written with raw SQL because Prisma cannot write tstzrange.
       // If another active booking overlaps, PostgreSQL rejects the row (error 23P01).
