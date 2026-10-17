@@ -18,7 +18,7 @@ export class BookingsService {
     }
     const end = new Date(start.getTime() + service.durationMin * 60000);
 
-    // Check the provider's weekly hours. Times are compared in UTC for this project.
+    // Times are compared in UTC for this project
     const hhmm = (d: Date) =>
       `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
 
@@ -35,8 +35,6 @@ export class BookingsService {
     }
 
     try {
-      // The time range is written with raw SQL because Prisma cannot write tstzrange.
-      // If another active booking overlaps, PostgreSQL rejects the row (error 23P01).
       await this.prisma.$executeRaw`
         INSERT INTO appointments
           (id, customer_id, provider_id, service_id, time_range, status, price_cents_snapshot, updated_at)
@@ -64,5 +62,33 @@ export class BookingsService {
       startsAt: start,
       endsAt: end,
     };
+  }
+
+  // Lists only the logged-in customer's bookings. The WHERE clause uses the token's user ID.
+  async listMine(customerId: string) {
+    return this.prisma.$queryRaw`
+      SELECT id, status, price_cents_snapshot AS "priceCents",
+             lower(time_range) AS "startsAt", upper(time_range) AS "endsAt"
+      FROM appointments
+      WHERE customer_id = ${customerId}::uuid
+      ORDER BY lower(time_range) DESC`;
+  }
+
+  async cancel(customerId: string, appointmentId: string) {
+    // The search includes customerId, so another customer's booking looks like it doesn't exist
+    const appt = await this.prisma.appointment.findFirst({
+      where: { id: appointmentId, customerId },
+    });
+    if (!appt) {
+      throw new NotFoundException('Booking not found');
+    }
+    if (appt.status === 'CANCELLED') {
+      return { id: appt.id, status: 'CANCELLED' };
+    }
+    const updated = await this.prisma.appointment.update({
+      where: { id: appointmentId },
+      data: { status: 'CANCELLED' },
+    });
+    return { id: updated.id, status: updated.status };
   }
 }

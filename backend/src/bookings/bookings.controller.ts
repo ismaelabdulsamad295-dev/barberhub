@@ -1,4 +1,4 @@
-import { Body, Controller, Post, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Request, UseGuards } from '@nestjs/common';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -13,7 +13,20 @@ export class BookingsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('CUSTOMER')
   create(@Request() req, @Body() dto: CreateBookingDto) {
-    // The customer ID comes from the verified token, never from the body
     return this.bookingsService.create(req.user.sub, dto);
+  }
+
+  @Get('mine')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('CUSTOMER')
+  listMine(@Request() req) {
+    return this.bookingsService.listMine(req.user.sub);
+  }
+
+  @Patch(':id/cancel')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('CUSTOMER')
+  cancel(@Request() req, @Param('id') id: string) {
+    return this.bookingsService.cancel(req.user.sub, id);
   }
 }
