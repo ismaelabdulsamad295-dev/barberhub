@@ -1,8 +1,9 @@
-import { Body, Controller, Post, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Param, Patch, Post, Request, UseGuards } from '@nestjs/common';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { CreateProviderProfileDto } from './dto/create-provider-profile.dto';
+import { CreateServiceDto, UpdateServiceDto } from './dto/service.dto';
 import { ProvidersService } from './providers.service';
 
 @Controller('providers')
@@ -13,7 +14,20 @@ export class ProvidersController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('PROVIDER')
   createProfile(@Request() req, @Body() dto: CreateProviderProfileDto) {
-    // The user ID comes from the verified token, never from the request body
     return this.providersService.createProfile(req.user.sub, dto);
+  }
+
+  @Post('services')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('PROVIDER')
+  createService(@Request() req, @Body() dto: CreateServiceDto) {
+    return this.providersService.createService(req.user.sub, dto);
+  }
+
+  @Patch('services/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('PROVIDER')
+  updateService(@Request() req, @Param('id') id: string, @Body() dto: UpdateServiceDto) {
+    return this.providersService.updateService(req.user.sub, id, dto);
   }
 }
