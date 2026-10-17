@@ -75,6 +75,8 @@ model ProviderProfile {
   services     Service[]
   appointments Appointment[]
 
+  availabilityRules AvailabilityRule[]
+
   @@map("provider_profiles")
 }
 
@@ -115,4 +117,16 @@ model Appointment {
   @@index([providerId])
   @@index([customerId])
   @@map("appointments")
+}
+model AvailabilityRule {
+  id         String          @id @default(uuid()) @db.Uuid
+  providerId String          @map("provider_id") @db.Uuid
+  weekday    Int             @db.SmallInt
+  startTime  String          @map("start_time") @db.VarChar(5)
+  endTime    String          @map("end_time") @db.VarChar(5)
+
+  provider ProviderProfile @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([providerId])
+  @@map("availability_rules")
 }

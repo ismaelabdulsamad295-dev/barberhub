@@ -1,7 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateProviderProfileDto } from './dto/create-provider-profile.dto';
+import { CreateAvailabilityDto } from './dto/availability.dto';
 import { CreateServiceDto, UpdateServiceDto } from './dto/service.dto';
 
 @Injectable()
@@ -26,7 +27,6 @@ export class ProvidersService {
     }
   }
 
-  // Finds the provider profile that belongs to the logged-in user
   private async getOwnProfileId(userId: string): Promise<string> {
     const profile = await this.prisma.providerProfile.findUnique({ where: { userId } });
     if (!profile) {
@@ -44,19 +44,34 @@ export class ProvidersService {
 
   async updateService(userId: string, serviceId: string, dto: UpdateServiceDto) {
     const providerId = await this.getOwnProfileId(userId);
-
-    // The search includes providerId, so another provider's service is not found.
-    // Returning 404 (not 403) avoids confirming that the service exists.
     const service = await this.prisma.service.findFirst({
       where: { id: serviceId, providerId },
     });
     if (!service) {
       throw new NotFoundException('Service not found');
     }
-
     return this.prisma.service.update({
       where: { id: serviceId },
       data: dto,
+    });
+  }
+
+  async createAvailability(userId: string, dto: CreateAvailabilityDto) {
+    // "HH:MM" in 24-hour format sorts correctly as text
+    if (dto.startTime >= dto.endTime) {
+      throw new BadRequestException('startTime must be before endTime');
+    }
+    const providerId = await this.getOwnProfileId(userId);
+    return this.prisma.availabilityRule.create({
+      data: { ...dto, providerId },
+    });
+  }
+
+  async listAvailability(userId: string) {
+    const providerId = await this.getOwnProfileId(userId);
+    return this.prisma.availabilityRule.findMany({
+      where: { providerId },
+      orderBy: [{ weekday: 'asc' }, { startTime: 'asc' }],
     });
   }
 }
